@@ -10,9 +10,6 @@ export const CHAT_MODEL = 'google/gemini-2.5-flash';
 /** OpenAI embeddings via OpenRouter — standard for semantic retrieval. */
 export const EMBED_MODEL = 'openai/text-embedding-3-small';
 
-/** Accurate speech-to-text for uploaded video files. */
-export const WHISPER_MODEL = 'openai/whisper-large-v3';
-
 const APP_TITLE = 'Lumina';
 
 export function openRouterHeaders(apiKey) {
@@ -194,28 +191,4 @@ export async function createEmbeddings(apiKey, input, { signal } = {}) {
   const data = await response.json();
   const sorted = [...(data?.data || [])].sort((a, b) => a.index - b.index);
   return sorted.map((row) => row.embedding);
-}
-
-export async function transcribeAudio(apiKey, audioBlob, { verbose = true } = {}) {
-  const formData = new FormData();
-  formData.append('file', new File([audioBlob], 'audio.wav', { type: 'audio/wav' }));
-  formData.append('model', WHISPER_MODEL);
-  if (verbose) {
-    formData.append('response_format', 'verbose_json');
-    formData.append('timestamp_granularities[]', 'segment');
-  } else {
-    formData.append('response_format', 'text');
-  }
-
-  const response = await fetch(`${OPENROUTER_BASE}/audio/transcriptions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173',
-      'X-OpenRouter-Title': APP_TITLE,
-    },
-    body: formData,
-  });
-
-  return response;
 }

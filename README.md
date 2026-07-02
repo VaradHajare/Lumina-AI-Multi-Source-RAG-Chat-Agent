@@ -5,7 +5,7 @@
 </div>
 <br>
 
-Lumina is a **citation-backed RAG research and study assistant**. Add your own sources (PDFs, web articles, YouTube videos, uploaded video files) and chat with them through a hybrid retrieval pipeline that runs entirely in the browser (no external vector database). Every answer streams token-by-token with inline citations that link back to the exact passage they came from, and any source can be turned into flashcards and quizzes.
+Lumina is a **citation-backed RAG research and study assistant**. Add your own sources (PDFs, web articles, YouTube videos) and chat with them through a hybrid retrieval pipeline that runs entirely in the browser (no external vector database). Every answer streams token-by-token with inline citations that link back to the exact passage they came from, and any source can be turned into flashcards and quizzes.
 
 Powered by [OpenRouter](https://openrouter.ai/) for chat, embeddings, and transcription.
 
@@ -48,7 +48,7 @@ Implementation: [`src/utils/rag.js`](src/utils/rag.js) (chunking, BM25, RRF, ded
 
 ### Research
 - **Streaming answers + Stop control**: responses stream over SSE; stop at any time and the partial answer is preserved (retrieval and stream abort together).
-- **Multi-modal ingestion**: PDFs, web articles, YouTube (metadata + transcript), and uploaded video files (Whisper transcription).
+- **Multi-modal ingestion**: PDFs, web articles, and YouTube videos (metadata + transcript). For any video, add it as a YouTube URL — the transcript path handles arbitrary length without in-browser audio decoding.
 - **Source-aware citations**: with multiple sources, each citation is tagged with which document it came from and links to the passage.
 - **Per-source focus**: scope a question to one source or ask across everything.
 
@@ -107,7 +107,7 @@ npm test           # Vitest unit tests
 
 - **Frontend**: React 18, Vite, vanilla CSS (CSS variables + `[data-theme]`)
 - **State**: custom observable store ([`src/lib/chatStore.js`](src/lib/chatStore.js)), persisted to `localStorage`
-- **LLM provider**: OpenRouter (chat, embeddings, Whisper, SSE streaming)
+- **LLM provider**: OpenRouter (chat, embeddings, SSE streaming)
 - **RAG**: [`src/utils/rag.js`](src/utils/rag.js) + [`src/utils/condense.js`](src/utils/condense.js)
 - **Analysis & study**: [`src/utils/analysis.js`](src/utils/analysis.js), [`src/utils/studio.js`](src/utils/studio.js)
 - **Parsing**: `pdfjs-dist`

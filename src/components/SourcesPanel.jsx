@@ -19,7 +19,6 @@ export default function SourcesPanel({
   disabled,
   onAddPdf,
   onAddUrl,
-  onAddVideo,
   onRemoveSource,
   panelOpen,
   onClosePanel,
@@ -27,7 +26,6 @@ export default function SourcesPanel({
   studioDisabled,
 }) {
   const pdfRef = useRef(null);
-  const videoRef = useRef(null);
 
   return (
     <>
@@ -132,15 +130,6 @@ export default function SourcesPanel({
               <IconLink />
               <span>Link</span>
             </button>
-            <button
-              type="button"
-              className="sources-add-btn"
-              disabled={disabled || busy}
-              onClick={() => videoRef.current?.click()}
-            >
-              <IconVideo />
-              <span>Video</span>
-            </button>
           </div>
         </div>
 
@@ -152,17 +141,6 @@ export default function SourcesPanel({
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) onAddPdf(file);
-            e.target.value = '';
-          }}
-        />
-        <input
-          ref={videoRef}
-          type="file"
-          accept="video/*"
-          hidden
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) onAddVideo(file);
             e.target.value = '';
           }}
         />

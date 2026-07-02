@@ -5,7 +5,6 @@ import {
   analysePDF,
   analyseArticleUrl,
   analyseYouTube,
-  analyseVideoFile,
   getYouTubeId,
   normalizeArticleUrl,
 } from '../utils/analysis.js';
@@ -332,8 +331,6 @@ export default function ChatApp() {
       } else if (attachment.type === 'youtube') {
         analysisResult = await analyseYouTube(apiKey, attachment.url, onProgress);
         attachLabel = attachment.url;
-      } else if (attachment.type === 'video') {
-        analysisResult = await analyseVideoFile(apiKey, attachment.file, onProgress);
       } else {
         throw new Error('Unsupported source type.');
       }
@@ -860,7 +857,6 @@ export default function ChatApp() {
         disabled={!apiKey}
         onAddPdf={(file) => addSource({ type: 'pdf', file, label: file.name })}
         onAddUrl={handleAttachUrl}
-        onAddVideo={(file) => addSource({ type: 'video', file, label: file.name })}
         onRemoveSource={removeSource}
         panelOpen={sourcesPanelOpen}
         onClosePanel={() => setSourcesPanelOpen(false)}

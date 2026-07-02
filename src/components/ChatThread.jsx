@@ -54,7 +54,7 @@ export default function ChatThread({
           <p className="chat-welcome-sub">
             {tempMode
               ? 'Add a source from the panel to start a private, unsaved session. Nothing here is written to your history.'
-              : 'Add a PDF, article, YouTube link, or video from the Sources panel. Lumina reads it, answers with exact citations, and turns it into flashcards & quizzes.'}
+              : 'Add a PDF, article, or YouTube link from the Sources panel. Lumina reads it, answers with exact citations, and turns it into flashcards & quizzes.'}
           </p>
           <div className="chat-welcome-features">
             <div className="chat-welcome-feature">
@@ -63,7 +63,7 @@ export default function ChatThread({
             </div>
             <div className="chat-welcome-feature">
               <IconVideo className="chat-welcome-feature-icon" />
-              <span>YouTube &amp; Video</span>
+              <span>YouTube Videos</span>
             </div>
             <div className="chat-welcome-feature">
               <IconSparkle className="chat-welcome-feature-icon" />
