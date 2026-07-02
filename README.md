@@ -1,7 +1,7 @@
 # Lumina AI: Multi-Source RAG Study & Research Agent
 <br>
 <div align="center">
-  <img width="1907" height="911" alt="image" src="https://github.com/user-attachments/assets/81923d8c-6fe1-4833-9ec2-75d6cdc85f19" />
+  <img width="1900" height="917" alt="image" src="https://github.com/user-attachments/assets/f4e1bf9b-4826-4700-a9dd-d4c8ec4c04ba" />
 </div>
 <br>
 
