@@ -131,6 +131,7 @@ export default function SourcesPanel({
               <span>Link</span>
             </button>
           </div>
+          <p className="sources-add-hint">Link supports web articles &amp; YouTube videos</p>
         </div>
 
         <input
