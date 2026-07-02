@@ -76,9 +76,25 @@ Rules for "summary":
  * Send extracted text to OpenRouter for structured analysis.
  * Returns the parsed JSON result object.
  */
+// Free-tier OpenRouter models cap prompt size (~34k tokens), and a long PDF or
+// video transcript easily exceeds that. The summary only needs a representative
+// slice — the full text is still embedded for retrieval — so sample the head
+// and tail to stay well under the cap while still covering the start and end.
+const MAX_ANALYSIS_CHARS = 60_000;
+
+function sampleForAnalysis(text) {
+  const t = String(text || '');
+  if (t.length <= MAX_ANALYSIS_CHARS) return t;
+  const head = Math.floor(MAX_ANALYSIS_CHARS * 0.7);
+  const tail = MAX_ANALYSIS_CHARS - head;
+  return `${t.slice(0, head)}\n\n[… middle omitted to fit the model's context limit …]\n\n${t.slice(-tail)}`;
+}
+
 export async function callAnalysisChat(apiKey, userText, sourceType, onProgress) {
   const chatModel = getChatModel();
   onProgress?.(60, `Analysing with ${chatModel}...`);
+
+  const analysisText = sampleForAnalysis(userText);
 
   const videoPreamble =
     sourceType === 'video'
@@ -99,7 +115,7 @@ export async function callAnalysisChat(apiKey, userText, sourceType, onProgress)
       {
         role:    'user',
         content:
-          `Source type: ${sourceType}\n\n${videoPreamble}${articlePreamble}Content to analyse:\n\n${userText}`,
+          `Source type: ${sourceType}\n\n${videoPreamble}${articlePreamble}Content to analyse:\n\n${analysisText}`,
       },
     ],
     response_format: { type: 'json_object' },
