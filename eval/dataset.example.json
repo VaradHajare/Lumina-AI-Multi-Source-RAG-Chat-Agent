@@ -1,0 +1,29 @@
+{
+  "description": "Example eval set. Replace with your own documents and 20-30 questions. answerSpans are verbatim substrings from the source text that a correct retrieval must surface (any one span counts as a hit).",
+  "sources": [
+    {
+      "id": "sdlc",
+      "title": "SDLC Overview",
+      "type": "pdf",
+      "text": "[Page 1] The software development lifecycle consists of five phases. The planning phase defines project scope, budget, and timeline. The design phase produces system architecture and interface specifications.\n[Page 2] The implementation phase is where developers write and review code. The testing phase validates the system against requirements using unit, integration, and acceptance tests. The deployment phase releases the system to production and includes rollback procedures.\n[Page 3] Maintenance costs typically account for 60 to 80 percent of total lifecycle cost. Technical debt accumulated during implementation is the primary driver of maintenance cost growth."
+    }
+  ],
+  "questions": [
+    {
+      "q": "What are the phases of the SDLC?",
+      "answerSpans": ["consists of five phases"]
+    },
+    {
+      "q": "What happens during the testing phase?",
+      "answerSpans": ["validates the system against requirements"]
+    },
+    {
+      "q": "How much of total cost does maintenance account for?",
+      "answerSpans": ["60 to 80 percent of total lifecycle cost"]
+    },
+    {
+      "q": "What drives maintenance cost growth?",
+      "answerSpans": ["Technical debt accumulated during implementation"]
+    }
+  ]
+}
