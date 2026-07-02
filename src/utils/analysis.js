@@ -100,7 +100,7 @@ function readVideoFileTechnicalMeta(file) {
   });
 }
 
-function transcriptFromWhisperVerboseJson(rawJson) {
+function transcriptFromWhisperVerboseJson(rawJson, offsetSec = 0) {
   let data;
   try {
     data = JSON.parse(rawJson);
@@ -112,7 +112,9 @@ function transcriptFromWhisperVerboseJson(rawJson) {
   if (Array.isArray(segments) && segments.length > 0) {
     const lines = segments
       .map((seg) => {
-        const stamp = formatMediaTimestamp(seg.start ?? 0);
+        // Offset by the chunk's start so stitched-together windows keep
+        // absolute timestamps relative to the whole recording.
+        const stamp = formatMediaTimestamp((seg.start ?? 0) + offsetSec);
         const txt   = String(seg.text ?? '').replace(/\s+/g, ' ').trim();
         return txt ? `[${stamp}] ${txt}` : '';
       })
@@ -125,19 +127,21 @@ function transcriptFromWhisperVerboseJson(rawJson) {
   return plain.length >= 20 ? plain : null;
 }
 
-async function transcribeWavWithWhisper(apiKey, wavBlob, onProgress) {
+// Transcribe a single WAV blob. `offsetSec` shifts segment timestamps so a
+// chunk of a longer recording keeps absolute times. Returns null for an empty
+// transcript (a silent chunk) rather than throwing, so the caller can decide
+// whether the whole recording came back empty; throws only on an API error.
+async function transcribeWavWithWhisper(apiKey, wavBlob, offsetSec = 0) {
   const post = (verbose) => transcribeAudio(apiKey, wavBlob, { verbose });
 
   const extractTranscript = (body) => {
     const t = String(body || '').trim();
     if (!t) return null;
     if (t.startsWith('{')) {
-      return transcriptFromWhisperVerboseJson(body);
+      return transcriptFromWhisperVerboseJson(body, offsetSec);
     }
     return t.length >= 20 ? t : null;
   };
-
-  onProgress?.(48, 'Transcribing audio with Whisper (OpenRouter)...');
 
   let whisperResp = await post(true);
   let raw         = await whisperResp.text();
@@ -151,10 +155,6 @@ async function transcribeWavWithWhisper(apiKey, wavBlob, onProgress) {
       throw new Error(`Whisper transcription error: ${err?.error?.message || err?.message || whisperResp.status}`);
     }
     out = extractTranscript(raw);
-  }
-
-  if (!out) {
-    throw new Error('Whisper returned an empty transcript. The video may have no audible speech.');
   }
 
   return out;
@@ -559,54 +559,95 @@ export async function analyseYouTube(apiKey, videoUrl, onProgress) {
 
 // ── Audio extraction + Whisper transcription ──────────────────────────────────
 
+// Whisper caps each request at 25 MB. 16 kHz mono 16-bit PCM (~32 KB/s) keeps a
+// ~10-minute window near ~18 MB, well under the cap; windows are stitched back
+// with absolute timestamps, so the old "trim your video / 25 MB" limit is gone.
+const TARGET_SAMPLE_RATE = 16_000;
+const CHUNK_SECONDS = 600;
+
 /**
- * Extract audio from a video File using the Web Audio API + OfflineAudioContext,
- * encode it as WAV, then transcribe with Whisper via OpenRouter.
+ * Transcribe a video's audio with Whisper.
+ *
+ * Memory is the real constraint, not Whisper's size limit: decodeAudioData
+ * expands the whole audio track into RAM, so we avoid every extra full-size copy
+ * (no arrayBuffer.slice) and release the full-rate PCM before the upload loop.
+ * We downmix to 16 kHz mono and transcribe in ~10-minute windows, stitching the
+ * segments back with absolute timestamps. A genuinely long (multi-hour)
+ * recording can still exceed browser memory and fails with a clear message —
+ * for that, add the video as a YouTube URL instead.
  */
 async function transcribeVideoFile(apiKey, file, onProgress) {
   onProgress?.(18, 'Decoding video audio...');
 
-  const MAX_FILE_BYTES = 25 * 1024 * 1024;
-  if (file.size > MAX_FILE_BYTES) {
-    throw new Error(
-      `Video file is ${formatFileSize(file.size)}. Whisper accepts up to 25 MB. ` +
-      'Please trim the video or use a YouTube URL for longer content.'
-    );
-  }
-
-  const arrayBuffer = await file.arrayBuffer();
-  const audioCtx    = new (window.AudioContext || window.webkitAudioContext)();
+  // Pass the ArrayBuffer straight to decodeAudioData (it detaches it) rather
+  // than copying with slice(0) — for a large file that copy alone doubled peak
+  // memory and was the crash.
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   let audioBuffer;
-
   try {
-    audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+    audioBuffer = await audioCtx.decodeAudioData(await file.arrayBuffer());
   } catch {
     throw new Error(
-      'Could not extract audio from this video file. ' +
-      'Ensure it has an audio track and is in MP4, WebM, or MOV format.'
+      'Could not extract audio from this video. Make sure it has an audio track ' +
+      '(MP4, WebM, or MOV). A very long recording can also exceed the browser’s ' +
+      'memory — try a shorter clip or add it as a YouTube URL.'
     );
   } finally {
     await audioCtx.close();
   }
 
-  onProgress?.(32, 'Encoding audio for transcription...');
+  onProgress?.(28, 'Resampling audio for transcription...');
 
-  const TARGET_SAMPLE_RATE = 16_000;
-  const offline = new OfflineAudioContext(
-    1,
-    Math.ceil(audioBuffer.duration * TARGET_SAMPLE_RATE),
-    TARGET_SAMPLE_RATE
-  );
+  // Downmix to 16 kHz mono once, then drop the full-rate decoded buffer so it
+  // can be collected while we upload windows (the loop below is network-bound).
+  let samples;
+  try {
+    const offline = new OfflineAudioContext(
+      1,
+      Math.ceil(audioBuffer.duration * TARGET_SAMPLE_RATE),
+      TARGET_SAMPLE_RATE
+    );
+    const source = offline.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(offline.destination);
+    source.start(0);
+    samples = (await offline.startRendering()).getChannelData(0);
+  } catch {
+    throw new Error(
+      'This recording is too long to process in the browser. ' +
+      'Try a shorter clip or add it as a YouTube URL instead.'
+    );
+  } finally {
+    audioBuffer = null; // release the full-rate PCM before the upload loop
+  }
 
-  const source = offline.createBufferSource();
-  source.buffer = audioBuffer;
-  source.connect(offline.destination);
-  source.start(0);
+  const chunkSamples = CHUNK_SECONDS * TARGET_SAMPLE_RATE;
+  const totalChunks  = Math.max(1, Math.ceil(samples.length / chunkSamples));
 
-  const renderedBuffer = await offline.startRendering();
-  const wavBlob        = audioBufferToWav(renderedBuffer);
+  const pieces = [];
+  for (let i = 0; i < totalChunks; i += 1) {
+    const start   = i * chunkSamples;
+    const slice   = samples.subarray(start, start + chunkSamples);
+    const wavBlob = encodeWavFromSamples(slice, TARGET_SAMPLE_RATE);
 
-  return transcribeWavWithWhisper(apiKey, wavBlob, onProgress);
+    // Progress across the 32→48 band, one step per window.
+    const pct = 32 + Math.round(((i + 1) / totalChunks) * 16);
+    onProgress?.(
+      pct,
+      totalChunks > 1
+        ? `Transcribing audio with Whisper (part ${i + 1} of ${totalChunks})...`
+        : 'Transcribing audio with Whisper (OpenRouter)...'
+    );
+
+    const part = await transcribeWavWithWhisper(apiKey, wavBlob, start / TARGET_SAMPLE_RATE);
+    if (part) pieces.push(part);
+  }
+
+  if (!pieces.length) {
+    throw new Error('Whisper returned an empty transcript. The video may have no audible speech.');
+  }
+
+  return pieces.join('\n');
 }
 
 // ── Public: analyse video file ────────────────────────────────────────────────
@@ -640,12 +681,10 @@ export async function analyseVideoFile(apiKey, file, onProgress) {
 }
 
 // ── WAV encoder ──────────────────────────────────────────────────────────────
-// Encodes a mono 16-bit PCM WAV from an AudioBuffer.
+// Encodes a mono 16-bit PCM WAV from a Float32 sample array.
 
-function audioBufferToWav(buffer) {
+function encodeWavFromSamples(samples, sampleRate) {
   const numChannels = 1;
-  const sampleRate  = buffer.sampleRate;
-  const samples     = buffer.getChannelData(0);
   const bitsPerSamp = 16;
   const bytesPerSamp = bitsPerSamp / 8;
   const dataLen     = samples.length * bytesPerSamp;
