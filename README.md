@@ -7,7 +7,7 @@
 
 Lumina is a **citation-backed RAG research and study assistant**. Add your own sources (PDFs, web articles, YouTube videos) and chat with them through a hybrid retrieval pipeline that runs entirely in the browser (no external vector database). Every answer streams token-by-token with inline citations that link back to the exact passage they came from, and any source can be turned into flashcards and quizzes.
 
-Powered by [OpenRouter](https://openrouter.ai/) for chat, embeddings, and transcription.
+Powered by [OpenRouter](https://openrouter.ai/) for chat and embeddings.
 
 ## Retrieval pipeline
 
